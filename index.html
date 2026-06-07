@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>《甄嬛传》人物关系网络分析 · 增强版</title>
+    <script src="https://d3js.org/d3.v7.min.js">
+    </script>
+    <style>
+        :root {
+            --bg: #f8f6f2;
+            --card-bg: #ffffff;
+            --text: #2c2416;
+            --text-secondary: #5c5347;
+            --accent: #8b1a1a;
+            --accent2: #3d5a80;
+            --border: #e0d8cc;
+            --shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+            --radius: 10px;
+            --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', 'Songti SC', 'SimSun', 'KaiTi', 'STKaiti', serif;
+            --font-sans: 'Noto Sans SC', 'Source Han Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            font-family: var(--font-sans);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a0a0a 0%, #2d1010 40%, #3d1a1a 100%);
+            color: #f0e0c8;
+            padding: 22px 32px;
+            text-align: center;
+            border-bottom: 3px solid #8b1a1a;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 30% 50%, rgba(180, 120, 60, 0.12) 0%, transparent 60%),
+                radial-gradient(ellipse at 70% 50%, rgba(180, 120, 60, 0.08) 0%, transparent 60%);
+            pointer-events: none;
+        }
+        .header h1 {
+            font-family: var(--font-serif);
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            position: relative;
+            z-index: 1;
+        }
+        .header .subtitle {
+            font-size: 0.9rem;
+            opacity: 0.75;
+            margin-top: 4px;
+            letter-spacing: 0.06em;
+            position: relative;
+            z-index: 1;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            padding: 20px 24px;
+            max-width: 1500px;
+            margin: 0 auto;
+            min-height: calc(100vh - 130px);
+        }
+
+        /* 左侧：网络图 */
+        .viz-panel {
+            flex: 1 1 62%;
+            min-width: 0;
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .viz-panel .panel-header {
+            padding: 14px 20px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 0.95rem;
+            letter-spacing: 0.03em;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .viz-panel .panel-header-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .viz-panel .panel-header-left::before {
+            content: '◈';
+            font-size: 0.7rem;
+            color: #c4956a;
+        }
+        .search-box {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .search-box input {
+            padding: 6px 12px;
+            border: 1px solid #d5c8b0;
+            border-radius: 16px;
+            font-size: 0.8rem;
+            font-family: var(--font-sans);
+            width: 160px;
+            background: #fdfaf4;
+            transition: all 0.2s;
+        }
+        .search-box input:focus {
+            outline: none;
+            border-color: #8b1a1a;
+            box-shadow: 0 0 0 2px rgba(139, 26, 26, 0.1);
+        }
+        .search-box button {
+            background: #8b1a1a;
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            padding: 6px 14px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            transition: background 0.2s;
+        }
+        .search-box button:hover {
+            background: #a52a2a;
+        }
+        .svg-container {
+            flex: 1;
+            position: relative;
+            cursor: grab;
+            min-height: 550px;
+        }
+        .svg-container:active {
+            cursor: grabbing;
+        }
+        .svg-container svg {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 右侧面板 */
+        .info-panel {
+            flex: 0 0 460px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            overflow-y: auto;
+            max-height: calc(100vh - 160px);
+            position: sticky;
+            top: 20px;
+            padding-right: 4px;
+        }
+        .info-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
+            padding: 16px 18px;
+            transition: box-shadow 0.2s;
+        }
+        .info-card:hover {
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.1);
+        }
+        .info-card h3 {
+            font-family: var(--font-serif);
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f0e8d8;
+            letter-spacing: 0.03em;
+        }
+        .info-card h4 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #5c3d1e;
+            margin: 8px 0 4px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px dotted #e8e0d4;
+            font-size: 0.85rem;
+        }
+        .stat-row .stat-label {
+            color: var(--text-secondary);
+        }
+        .stat-row .stat-value {
+            font-weight: 700;
+            color: #2c2416;
+            font-family: 'SF Mono', 'Consolas', 'Menlo', monospace;
+            font-size: 0.9rem;
+        }
+
+        .rank-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.8rem;
+            margin-top: 6px;
+        }
+        .rank-table th {
+            background: #f5f0e8;
+            padding: 7px 8px;
+            text-align: left;
+            font-weight: 600;
+            font-size: 0.75rem;
+            letter-spacing: 0.04em;
+            color: #5c3d1e;
+            border-bottom: 2px solid #d5c8b0;
+        }
+        .rank-table td {
+            padding: 6px 8px;
+            border-bottom: 1px solid #efe8d8;
+            font-size: 0.78rem;
+        }
+        .rank-table tr:nth-child(even) td {
+            background: #fdfaf6;
+        }
+        .rank-table tr:hover td {
+            background: #fdf4e8;
+        }
+        .rank-table .rank-num {
+            font-weight: 700;
+            color: var(--accent);
+            width: 28px;
+            text-align: center;
+        }
+        .highlight-row {
+            background: #fef9f0 !important;
+        }
+        .highlight-row td {
+            font-weight: 600;
+        }
+
+        .community-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            letter-spacing: 0.03em;
+            margin: 1px 2px;
+        }
+        .comm-0 {
+            background: #fde8e8;
+            color: #8b1a1a;
+        }
+        .comm-1 {
+            background: #ede0f5;
+            color: #5b1e7b;
+        }
+        .comm-2 {
+            background: #fef0e0;
+            color: #8b4d1a;
+        }
+        .comm-3 {
+            background: #e0ecf8;
+            color: #1a3d5c;
+        }
+        .comm-4 {
+            background: #e0f5ee;
+            color: #1a5c3d;
+        }
+
+        .legend-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 4px 0;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.75rem;
+        }
+        .legend-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            border: 1.5px solid rgba(0, 0, 0, 0.2);
+        }
+
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: rgba(20, 10, 5, 0.92);
+            color: #f5ece0;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            line-height: 1.5;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+            z-index: 100;
+            max-width: 220px;
+            border: 1px solid rgba(200, 160, 100, 0.4);
+        }
+        .tooltip .tt-name {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: #f0c888;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .tooltip .tt-detail {
+            color: #d5c0a0;
+            font-size: 0.72rem;
+        }
+
+        .analysis-text {
+            font-size: 0.82rem;
+            color: #4a3d2e;
+            line-height: 1.7;
+        }
+        .analysis-text strong {
+            color: #8b1a1a;
+        }
+        .analysis-text em {
+            color: #5c3d1e;
+            font-style: italic;
+        }
+
+        @media (max-width: 1100px) {
+            .main-container {
+                flex-direction: column;
+                padding: 12px;
+                gap: 14px;
+            }
+            .info-panel {
+                flex: 0 0 auto;
+                max-height: none;
+                position: static;
+            }
+            .viz-panel .svg-container {
+                min-height: 420px;
+            }
+            .header h1 {
+                font-size: 1.4rem;
+            }
+        }
+        @media (max-width: 600px) {
+            .info-panel {
+                flex: 0 0 auto;
+            }
+            .info-card {
+                padding: 12px;
+            }
+            .rank-table {
+                font-size: 0.7rem;
+            }
+            .rank-table th,
+            .rank-table td {
+                padding: 4px 5px;
+            }
+            .header {
+                padding: 14px 16px;
+            }
+            .header h1 {
+                font-size: 1.2rem;
+            }
+            .search-box input {
+                width: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>《甄嬛传》人物关系网络分析 · 增强版</h1>
+        <div class="subtitle">社会网络分析（SNA）· 含社区排名 & 特征向量中心性 & 聚类系数</div>
+    </div>
+
+    <div class="main-container">
+        <!-- 左侧：网络可视化 -->
+        <div class="viz-panel" id="vizPanel">
+            <div class="panel-header">
+                <div class="panel-header-left">人物关系网络图</div>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="搜索人物...">
+                    <button id="searchBtn">🔍 定位</button>
+                    <button id="resetBtn" style="background:#5c5347;">↺ 重置</button>
+                </div>
+            </div>
+            <div class="svg-container" id="svgContainer">
+                <svg id="networkSvg"></svg>
+            </div>
+            <div class="tooltip" id="tooltip" style="display:none;"></div>
+        </div>
+
+        <!-- 右侧：信息面板 -->
+        <div class="info-panel" id="infoPanel">
+            <!-- 统计概览 -->
+            <div class="info-card" id="cardStats">
+                <h3>📊 网络统计概览</h3>
+                <div class="stat-row"><span class="stat-label">节点总数</span><span class="stat-value" id="statNodes">-</span></div>
+                <div class="stat-row"><span class="stat-label">边总数（无向）</span><span class="stat-value" id="statEdges">-</span></div>
+                <div class="stat-row"><span class="stat-label">平均度 ⟨k⟩</span><span class="stat-value" id="statAvgDegree">-</span></div>
+                <div class="stat-row"><span class="stat-label">网络直径</span><span class="stat-value" id="statDiameter">-</span></div>
+                <div class="stat-row"><span class="stat-label">图密度</span><span class="stat-value" id="statDensity">-</span></div>
+                <div class="stat-row"><span class="stat-label">平均聚类系数 ⟨C⟩</span><span class="stat-value" id="statClustering">-</span></div>
+                <div class="stat-row"><span class="stat-label">模块化 Q（模拟）</span><span class="stat-value" id="statModularity">-</span></div>
+                <div class="stat-row"><span class="stat-label">社区数量</span><span class="stat-value" id="statCommunities">-</span></div>
+            </div>
+
+            <!-- 度中心性排名 -->
+            <div class="info-card" id="cardDegree">
+                <h3>🏅 度中心性 Top 8</h3>
+                <table class="rank-table" id="tableDegree">
+                    <thead><tr><th>#</th><th>人物</th><th>度值</th><th>社区</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- 介数中心性排名 -->
+            <div class="info-card" id="cardBetweenness">
+                <h3>🌉 介数中心性 Top 8（桥梁人物）</h3>
+                <table class="rank-table" id="tableBetweenness">
+                    <thead><tr><th>#</th><th>人物</th><th>介数值</th><th>社区</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- 特征向量中心性排名 -->
+            <div class="info-card" id="cardEigenvector">
+                <h3>⚡ 特征向量中心性 Top 8</h3>
+                <table class="rank-table" id="tableEigenvector">
+                    <thead><tr><th>#</th><th>人物</th><th>特征向量</th><th>社区</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+
+            <!-- 社区排名 -->
+            <div class="info-card" id="cardCommunityRank">
+                <h3>🏘️ 社区排名与统计</h3>
+                <table class="rank-table" id="tableCommunityRank">
+                    <thead><tr><th>社区</th><th>名称</th><th>节点数</th><th>内部边</th><th>平均度</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="legend-container" id="legendContainer" style="margin-top:10px;"></div>
+                <div style="margin-top:8px; font-size:0.78rem; color:#5c5347;" id="communityDetail"></div>
+            </div>
+
+            <!-- 分析解读 -->
+            <div class="info-card" id="cardAnalysis">
+                <h3>📝 关键发现与人文阐释</h3>
+                <div class="analysis-text" id="analysisText"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ==================== 数据定义 ====================
+            const nodes = [
+                { id: 1, label: '甄嬛', gender: '女', faction: '甄家/主角' },
+                { id: 2, label: '雍正', gender: '男', faction: '皇权' },
+                { id: 3, label: '皇后', gender: '女', faction: '后党' },
+                { id: 4, label: '华妃', gender: '女', faction: '华妃党' },
+                { id: 5, label: '沈眉庄', gender: '女', faction: '甄嬛党' },
+                { id: 6, label: '安陵容', gender: '女', faction: '后党（原甄嬛党）' },
+                { id: 7, label: '果郡王', gender: '男', faction: '独立/果郡王系' },
+                { id: 8, label: '温实初', gender: '男', faction: '甄嬛党' },
+                { id: 9, label: '端妃', gender: '女', faction: '中立' },
+                { id: 10, label: '敬妃', gender: '女', faction: '甄嬛党' },
+                { id: 11, label: '齐妃', gender: '女', faction: '后党' },
+                { id: 12, label: '祺贵人', gender: '女', faction: '后党' },
+                { id: 13, label: '叶澜依', gender: '女', faction: '果郡王系' },
+                { id: 14, label: '浣碧', gender: '女', faction: '甄嬛党' },
+                { id: 15, label: '槿汐', gender: '女', faction: '甄嬛党' },
+                { id: 16, label: '苏培盛', gender: '男', faction: '中立偏甄' },
+                { id: 17, label: '太后', gender: '女', faction: '皇权' },
+                { id: 18, label: '曹贵人', gender: '女', faction: '华妃党' },
+                { id: 19, label: '淳贵人', gender: '女', faction: '甄嬛党' },
+                { id: 20, label: '年羹尧', gender: '男', faction: '华妃党' },
+            ];
+
+            const edgesRaw = [
+                [1, 2, 10],
+                [1, 5, 12],
+                [1, 6, 8],
+                [1, 7, 9],
+                [1, 8, 7],
+                [1, 3, 7],
+                [1, 4, 6],
+                [1, 14, 8],
+                [1, 15, 7],
+                [1, 10, 5],
+                [1, 9, 4],
+                [1, 19, 4],
+                [1, 12, 3],
+                [1, 16, 3],
+                [1, 18, 2],
+                [2, 3, 8],
+                [2, 4, 9],
+                [2, 17, 5],
+                [2, 7, 6],
+                [2, 16, 4],
+                [2, 20, 4],
+                [2, 11, 3],
+                [2, 13, 3],
+                [2, 9, 3],
+                [2, 10, 3],
+                [2, 6, 4],
+                [2, 12, 3],
+                [3, 4, 7],
+                [3, 6, 6],
+                [3, 11, 5],
+                [3, 12, 5],
+                [3, 17, 3],
+                [4, 18, 7],
+                [4, 20, 6],
+                [5, 8, 6],
+                [5, 6, 3],
+                [5, 17, 2],
+                [7, 13, 4],
+                [7, 14, 5],
+                [16, 15, 5],
+                [6, 12, 3],
+                [9, 10, 3],
+            ];
+
+            // 去重边
+            const edgeMap = new Map();
+            edgesRaw.forEach(([s, t, w]) => {
+                const key = Math.min(s, t) + '_' + Math.max(s, t);
+                if (!edgeMap.has(key) || edgeMap.get(key).weight < w) {
+                    edgeMap.set(key, { source: Math.min(s, t), target: Math.max(s, t), weight: w,
+                        type: 'Undirected' });
+                }
+            });
+            const edges = Array.from(edgeMap.values());
+
+            // ==================== 社区预设 ====================
+            const communityAssign = {
+                1: 0,
+                5: 0,
+                8: 0,
+                14: 0,
+                15: 0,
+                10: 0,
+                19: 0,
+                3: 1,
+                6: 1,
+                11: 1,
+                12: 1,
+                4: 2,
+                18: 2,
+                20: 2,
+                2: 3,
+                17: 3,
+                9: 3,
+                16: 3,
+                7: 4,
+                13: 4,
+            };
+            const communityNames = {
+                0: '甄嬛集团',
+                1: '后党',
+                2: '华妃党',
+                3: '皇权/中立',
+                4: '果郡王系',
+            };
+            const communityColors = {
+                0: '#c0392b',
+                1: '#7d3c98',
+                2: '#d97706',
+                3: '#2c5f8a',
+                4: '#1a7a4c',
+            };
+
+            const nodeMap = new Map();
+            nodes.forEach(n => {
+                n.community = communityAssign[n.id] !== undefined ? communityAssign[n.id] : 3;
+                n.communityName = communityNames[n.community] || '其他';
+                n.communityColor = communityColors[n.community] || '#888';
+                nodeMap.set(n.id, n);
+            });
+
+            // ==================== 邻接表 ====================
+            const adj = new Map();
+            nodes.forEach(n => adj.set(n.id, []));
+            edges.forEach(e => {
+                adj.get(e.source).push({ neighbor: e.target, weight: e.weight });
+                adj.get(e.target).push({ neighbor: e.source, weight: e.weight });
+            });
+
+            // ==================== 度中心性 ====================
+            const degreeMap = new Map();
+            nodes.forEach(n => degreeMap.set(n.id, adj.get(n.id).length));
+            nodes.forEach(n => n.degree = degreeMap.get(n.id));
+
+            // ==================== 介数中心性 ====================
+            function computeBetweenness() {
+                const betweenness = new Map();
+                nodes.forEach(n => betweenness.set(n.id, 0));
+                const allIds = nodes.map(n => n.id);
+                allIds.forEach(s => {
+                    const stack = [];
+                    const pred = new Map();
+                    const sigma = new Map();
+                    const dist = new Map();
+                    const delta = new Map();
+                    allIds.forEach(v => {
+                        pred.set(v, []);
+                        sigma.set(v, 0);
+                        dist.set(v, -1);
+                        delta.set(v, 0);
+                    });
+                    sigma.set(s, 1);
+                    dist.set(s, 0);
+                    const queue = [s];
+                    while (queue.length > 0) {
+                        const v = queue.shift();
+                        stack.push(v);
+                        adj.get(v).forEach(({ neighbor: w }) => {
+                            if (dist.get(w) < 0) {
+                                dist.set(w, dist.get(v) + 1);
+                                queue.push(w);
+                            }
+                            if (dist.get(w) === dist.get(v) + 1) {
+                                sigma.set(w, sigma.get(w) + sigma.get(v));
+                                pred.get(w).push(v);
+                            }
+                        });
+                    }
+                    while (stack.length > 0) {
+                        const w = stack.pop();
+                        pred.get(w).forEach(v => {
+                            const contrib = (sigma.get(v) / sigma.get(w)) * (1 + delta.get(w));
+                            delta.set(v, delta.get(v) + contrib);
+                        });
+                        if (w !== s) betweenness.set(w, betweenness.get(w) + delta.get(w));
+                    }
+                });
+                allIds.forEach(v => betweenness.set(v, betweenness.get(v) / 2));
+                const N = allIds.length;
+                const maxBc = (N - 1) * (N - 2) / 2;
+                if (maxBc > 0) allIds.forEach(v => betweenness.set(v, betweenness.get(v) / maxBc));
+                return betweenness;
+            }
+            const betweennessMap = computeBetweenness();
+            nodes.forEach(n => n.betweenness = betweennessMap.get(n.id));
+
+            // ==================== 特征向量中心性 ====================
+            function computeEigenvector(maxIter = 200, tol = 1e-8) {
+                const allIds = nodes.map(n => n.id);
+                const N = allIds.length;
+                let vec = new Map();
+                allIds.forEach(v => vec.set(v, 1.0));
+                const neighborSet = new Map();
+                allIds.forEach(v => neighborSet.set(v, new Set(adj.get(v).map(e => e.neighbor))));
+                for (let iter = 0; iter < maxIter; iter++) {
+                    const newVec = new Map();
+                    let sumSq = 0;
+                    allIds.forEach(v => {
+                        let s = 0;
+                        neighborSet.get(v).forEach(u => s += vec.get(u));
+                        newVec.set(v, s);
+                        sumSq += s * s;
+                    });
+                    const norm = Math.sqrt(sumSq);
+                    if (norm < 1e-12) break;
+                    let maxDiff = 0;
+                    allIds.forEach(v => {
+                        const nv = newVec.get(v) / norm;
+                        maxDiff = Math.max(maxDiff, Math.abs(nv - vec.get(v)));
+                        vec.set(v, nv);
+                    });
+                    if (maxDiff < tol) break;
+                }
+                const vals = Array.from(vec.values());
+                const vMin = Math.min(...vals);
+                const vMax = Math.max(...vals);
+                const range = vMax - vMin || 1;
+                const result = new Map();
+                allIds.forEach(v => result.set(v, (vec.get(v) - vMin) / range));
+                return result;
+            }
+            const eigenvectorMap = computeEigenvector();
+            nodes.forEach(n => n.eigenvector = eigenvectorMap.get(n.id));
+
+            // ==================== 聚类系数 ====================
+            function computeLocalClustering(nodeId) {
+                const neighbors = adj.get(nodeId).map(e => e.neighbor);
+                const k = neighbors.length;
+                if (k < 2) return 0;
+                const neighborSet = new Set(neighbors);
+                let possibleEdges = 0;
+                let actualEdges = 0;
+                for (let i = 0; i < neighbors.length; i++) {
+                    for (let j = i + 1; j < neighbors.length; j++) {
+                        possibleEdges++;
+                        if (neighborSet.has(neighbors[j]) && adj.get(neighbors[i]).some(e => e.neighbor ===
+                                neighbors[j])) {
+                            actualEdges++;
+                        }
+                    }
+                }
+                return actualEdges / possibleEdges;
+            }
+            const clusteringMap = new Map();
+            nodes.forEach(n => clusteringMap.set(n.id, computeLocalClustering(n.id)));
+            const avgClustering = Array.from(clusteringMap.values()).reduce((a, b) => a + b, 0) / nodes.length;
+
+            // ==================== 网络直径 ====================
+            function computeDiameter() {
+                const allIds = nodes.map(n => n.id);
+                let maxDist = 0;
+                allIds.forEach(s => {
+                    const dist = new Map();
+                    allIds.forEach(v => dist.set(v, Infinity));
+                    dist.set(s, 0);
+                    const queue = [s];
+                    while (queue.length > 0) {
+                        const v = queue.shift();
+                        adj.get(v).forEach(({ neighbor: w }) => {
+                            if (dist.get(w) === Infinity) {
+                                dist.set(w, dist.get(v) + 1);
+                                queue.push(w);
+                                maxDist = Math.max(maxDist, dist.get(w));
+                            }
+                        });
+                    }
+                });
+                return maxDist;
+            }
+            const diameter = computeDiameter();
+
+            // ==================== 整体统计 ====================
+            const totalNodes = nodes.length;
+            const totalEdges = edges.length;
+            const avgDegree = (totalEdges * 2) / totalNodes;
+            const maxPossibleEdges = totalNodes * (totalNodes - 1) / 2;
+            const density = totalEdges / maxPossibleEdges;
+            const communitySet = new Set(nodes.map(n => n.community));
+            const numCommunities = communitySet.size;
+
+            // 模块化Q
+            let internalWeight = 0;
+            let totalWeight = 0;
+            const commInternal = new Map();
+            const commTotal = new Map();
+            edges.forEach(e => {
+                const sc = nodeMap.get(e.source).community;
+                const tc = nodeMap.get(e.target).community;
+                totalWeight += e.weight;
+                commTotal.set(sc, (commTotal.get(sc) || 0) + e.weight);
+                commTotal.set(tc, (commTotal.get(tc) || 0) + e.weight);
+                if (sc === tc) {
+                    internalWeight += e.weight;
+                    commInternal.set(sc, (commInternal.get(sc) || 0) + e.weight);
+                }
+            });
+            let modularityQ = 0;
+            communitySet.forEach(c => {
+                const eIn = commInternal.get(c) || 0;
+                const eTot = commTotal.get(c) || 0;
+                modularityQ += (eIn / totalWeight) - Math.pow(eTot / (2 * totalWeight), 2);
+            });
+            modularityQ = Math.round(modularityQ * 1000) / 1000;
+
+            // 社区聚合统计
+            const communityStats = [];
+            communitySet.forEach(c => {
+                const members = nodes.filter(n => n.community === c);
+                const nodeCount = members.length;
+                const internalEdgesCount = edges.filter(e => {
+                    const sc = nodeMap.get(e.source).community;
+                    const tc = nodeMap.get(e.target).community;
+                    return sc === c && tc === c;
+                }).length;
+                const totalDegree = members.reduce((sum, n) => sum + n.degree, 0);
+                const avgDegComm = nodeCount > 0 ? totalDegree / nodeCount : 0;
+                communityStats.push({
+                    id: c,
+                    name: communityNames[c] || '未知',
+                    nodeCount,
+                    internalEdges: internalEdgesCount,
+                    avgDegree: avgDegComm,
+                });
+            });
+            communityStats.sort((a, b) => b.nodeCount - a.nodeCount);
+
+            // ==================== 填充统计面板 ====================
+            document.getElementById('statNodes').textContent = totalNodes;
+            document.getElementById('statEdges').textContent = totalEdges;
+            document.getElementById('statAvgDegree').textContent = avgDegree.toFixed(2);
+            document.getElementById('statDiameter').textContent = diameter;
+            document.getElementById('statDensity').textContent = density.toFixed(3);
+            document.getElementById('statClustering').textContent = avgClustering.toFixed(3);
+            document.getElementById('statModularity').textContent = modularityQ;
+            document.getElementById('statCommunities').textContent = numCommunities;
+
+            // ==================== 度排名 ====================
+            const sortedByDegree = [...nodes].sort((a, b) => b.degree - a.degree);
+            const tbodyDegree = document.querySelector('#tableDegree tbody');
+            sortedByDegree.slice(0, 8).forEach((n, i) => {
+                const row = tbodyDegree.insertRow();
+                row.innerHTML =
+                    `<td class="rank-num">${i+1}</td><td>${n.label}</td><td><strong>${n.degree}</strong></td><td><span class="community-tag comm-${n.community}">${n.communityName}</span></td>`;
+                if (i === 0) row.classList.add('highlight-row');
+            });
+
+            // ==================== 介数排名 ====================
+            const sortedByBc = [...nodes].sort((a, b) => b.betweenness - a.betweenness);
+            const tbodyBc = document.querySelector('#tableBetweenness tbody');
+            sortedByBc.slice(0, 8).forEach((n, i) => {
+                const row = tbodyBc.insertRow();
+                row.innerHTML =
+                    `<td class="rank-num">${i+1}</td><td>${n.label}</td><td><strong>${(n.betweenness*100).toFixed(1)}%</strong></td><td><span class="community-tag comm-${n.community}">${n.communityName}</span></td>`;
+                if (i === 0) row.classList.add('highlight-row');
+            });
+
+            // ==================== 特征向量排名 ====================
+            const sortedByEig = [...nodes].sort((a, b) => b.eigenvector - a.eigenvector);
+            const tbodyEig = document.querySelector('#tableEigenvector tbody');
+            sortedByEig.slice(0, 8).forEach((n, i) => {
+                const row = tbodyEig.insertRow();
+                row.innerHTML =
+                    `<td class="rank-num">${i+1}</td><td>${n.label}</td><td><strong>${(n.eigenvector*100).toFixed(1)}%</strong></td><td><span class="community-tag comm-${n.community}">${n.communityName}</span></td>`;
+                if (i === 0) row.classList.add('highlight-row');
+            });
+
+            // ==================== 社区排名表 ====================
+            const tbodyCommRank = document.querySelector('#tableCommunityRank tbody');
+            communityStats.forEach((cs, i) => {
+                const row = tbodyCommRank.insertRow();
+                row.innerHTML = `
+                    <td><span class="community-tag comm-${cs.id}">社区${cs.id}</span></td>
+                    <td><strong>${cs.name}</strong></td>
+                    <td>${cs.nodeCount}</td>
+                    <td>${cs.internalEdges}</td>
+                    <td>${cs.avgDegree.toFixed(1)}</td>
+                `;
+            });
+
+            // 社区图例与详情
+            const legendContainer = document.getElementById('legendContainer');
+            communitySet.forEach(c => {
+                const members = nodes.filter(n => n.community === c).map(n => n.label).join('、');
+                const div = document.createElement('div');
+                div.className = 'legend-item';
+                div.innerHTML =
+                    `<span class="legend-dot" style="background:${communityColors[c]};"></span><span><strong>社区${c}:</strong> ${communityNames[c]}</span>`;
+                div.title = '成员：' + members;
+                legendContainer.appendChild(div);
+            });
+            const communityDetail = document.getElementById('communityDetail');
+            let detailHtml = '';
+            communityStats.forEach(cs => {
+                const members = nodes.filter(n => n.community === cs.id).map(n => n.label);
+                detailHtml +=
+                    `<span class="community-tag comm-${cs.id}">社区${cs.id}</span> <em>${cs.name}</em>：${members.join('、')}<br>`;
+            });
+            communityDetail.innerHTML = detailHtml;
+
+            // ==================== 分析文本 ====================
+            const topDegree = sortedByDegree[0];
+            const topBc = sortedByBc[0];
+            const topEig = sortedByEig[0];
+            const analysisText = document.getElementById('analysisText');
+            analysisText.innerHTML = `
+                <p><strong>① 度中心性：</strong><em>${topDegree.label}</em>（度=${topDegree.degree}）是社交核心，连接了最多人物。</p>
+                <p><strong>② 桥梁人物：</strong><em>${topBc.label}</em>（介数=${(topBc.betweenness*100).toFixed(1)}%）横跨不同派系，是网络“结构洞”。</p>
+                <p><strong>③ 特征向量中心性：</strong><em>${topEig.label}</em>（${(topEig.eigenvector*100).toFixed(1)}%）不仅人脉广，而且相连的都是关键节点，影响力辐射力强。</p>
+                <p><strong>④ 社区结构：</strong>${numCommunities}个社区与原著阵营高度一致，模块化Q=${modularityQ}，平均聚类系数=${avgClustering.toFixed(3)}，说明后宫中派系内部紧密、派系间通过少数人物连接。</p>
+                <p><strong>⑤ 人文阐释：</strong>网络指标揭示了《甄嬛传》的核心权力逻辑——<em>高聚类、低密度的结构意味着信息壁垒与派系忠诚，而高介数中心性的“桥梁”角色往往是剧情转折的关键。</em></p>
+            `;
+
+            // ==================== D3 力导向图 ====================
+            const svgContainer = document.getElementById('svgContainer');
+            const svg = d3.select('#networkSvg');
+            const tooltip = d3.select('#tooltip');
+            const containerRect = svgContainer.getBoundingClientRect();
+            const width = containerRect.width || 700;
+            const height = Math.max(550, containerRect.height || 580);
+            svg.attr('viewBox', `0 0 ${width} ${height}`).attr('preserveAspectRatio', 'xMidYMid meet');
+            const g = svg.append('g');
+
+            const zoom = d3.zoom()
+                .scaleExtent([0.3, 4])
+                .on('zoom', (event) => g.attr('transform', event.transform));
+            svg.call(zoom);
+            const initialScale = 0.85;
+            svg.call(zoom.transform, d3.zoomIdentity.translate(width * 0.08, height * 0.05).scale(initialScale));
+
+            const d3Nodes = nodes.map(n => ({ ...n }));
+            const d3Edges = edges.map(e => ({ source: e.source, target: e.target, weight: e.weight, type: e.type }));
+
+            const simulation = d3.forceSimulation(d3Nodes)
+                .force('link', d3.forceLink(d3Edges).id(d => d.id)
+                    .distance(d => Math.max(40, 180 / Math.sqrt(d.weight)))
+                    .strength(d => 0.3 + d.weight * 0.06))
+                .force('charge', d3.forceManyBody().strength(-350))
+                .force('center', d3.forceCenter(width / 2, height / 2))
+                .force('collide', d3.forceCollide().radius(d => Math.max(10, d.degree * 2.6 + 6)).iterations(3))
+                .force('x', d3.forceX(width / 2).strength(0.02))
+                .force('y', d3.forceY(height / 2).strength(0.02));
+
+            const link = g.append('g').attr('class', 'links').selectAll('line')
+                .data(d3Edges).join('line')
+                .attr('stroke', '#c8b89a').attr('stroke-opacity', 0.55)
+                .attr('stroke-width', d => Math.max(1, Math.min(7, d.weight * 0.7)))
+                .attr('stroke-linecap', 'round');
+
+            const linkLabel = g.append('g').attr('class', 'link-labels').selectAll('text')
+                .data(d3Edges.filter(e => e.weight >= 7)).join('text')
+                .attr('font-size', '8px').attr('fill', '#8b7355').attr('text-anchor', 'middle').attr('dy', '-4')
+                .text(d => d.weight);
+
+            const nodeGroup = g.append('g').attr('class', 'nodes').selectAll('g')
+                .data(d3Nodes).join('g')
+                .attr('cursor', 'pointer')
+                .call(d3.drag()
+                    .on('start', (event, d) => { if (!event.active) simulation.alphaTarget(0.3).restart();
+                        d.fx = d.x;
+                        d.fy = d.y; })
+                    .on('drag', (event, d) => { d.fx = event.x;
+                        d.fy = event.y; })
+                    .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0);
+                        d.fx = null;
+                        d.fy = null; }));
+
+            nodeGroup.append('circle')
+                .attr('r', d => d.betweenness > 0.08 ? d.degree * 2.6 + 10 : 0)
+                .attr('fill', 'none').attr('stroke', d => d.betweenness > 0.08 ? '#f0c040' : 'none')
+                .attr('stroke-width', 2.5).attr('stroke-opacity', 0.7).attr('stroke-dasharray', '4,2')
+                .attr('pointer-events', 'none');
+
+            nodeGroup.append('circle')
+                .attr('r', d => Math.max(5, d.degree * 2.2 + 4))
+                .attr('fill', d => d.communityColor).attr('fill-opacity', 0.85)
+                .attr('stroke', '#fff').attr('stroke-width', 1.8).attr('stroke-opacity', 0.9)
+                .attr('filter', 'drop-shadow(0 1px 3px rgba(0,0,0,0.25))');
+
+            nodeGroup.append('text')
+                .text(d => d.label)
+                .attr('font-size', d => Math.max(9, Math.min(13, d.degree * 0.9 + 6)) + 'px')
+                .attr('font-weight', d => d.degree >= 10 ? 700 : 500)
+                .attr('fill', '#2c1f0e').attr('text-anchor', 'middle')
+                .attr('dy', d => Math.max(5, d.degree * 2.2 + 4) + 14)
+                .attr('pointer-events', 'none').attr('paint-order', 'stroke')
+                .attr('stroke', '#fffef9').attr('stroke-width', '2.5px').attr('stroke-opacity', 0.7);
+
+            // 交互
+            nodeGroup.on('mouseenter', function(event, d) {
+                    const neighborIds = new Set(adj.get(d.id).map(e => e.neighbor));
+                    d3.select(this).select('circle:nth-child(2)').attr('stroke', '#ffd700').attr('stroke-width',
+                        3.5).attr('fill-opacity', 1);
+                    link.attr('stroke-opacity', le => (le.source.id === d.id || le.target.id === d.id) ? 0.9 : 0.15)
+                        .attr('stroke', le => (le.source.id === d.id || le.target.id === d.id) ? '#5a3d1a' :
+                            '#c8b89a')
+                        .attr('stroke-width', le => (le.source.id === d.id || le.target.id === d.id) ? Math.max(2.5,
+                            le.weight * 0.85) : Math.max(0.6, le.weight * 0.35));
+                    nodeGroup.selectAll('circle:nth-child(2)')
+                        .attr('fill-opacity', nd => neighborIds.has(nd.id) || nd.id === d.id ? 1 : 0.35)
+                        .attr('stroke-opacity', nd => neighborIds.has(nd.id) || nd.id === d.id ? 1 : 0.4);
+                    nodeGroup.selectAll('text').attr('fill-opacity', nd => neighborIds.has(nd.id) || nd.id === d.id ? 1 :
+                        0.3);
+                    tooltip.style('display', 'block').html(`
+                        <span class="tt-name">${d.label}</span>
+                        <span class="tt-detail">
+                        度：<strong>${d.degree}</strong><br>
+                        介数：<strong>${(d.betweenness*100).toFixed(1)}%</strong><br>
+                        特征向量：<strong>${(d.eigenvector*100).toFixed(1)}%</strong><br>
+                        聚类系数：<strong>${clusteringMap.get(d.id).toFixed(3)}</strong><br>
+                        社区：${d.communityName}
+                        </span>
+                    `);
+                })
+                .on('mousemove', function(event) {
+                    const [mx, my] = d3.pointer(event, svgContainer);
+                    const tx = mx + 18;
+                    const ty = my - 70;
+                    const tipEl = tooltip.node();
+                    const tipW = tipEl.offsetWidth;
+                    const tipH = tipEl.offsetHeight;
+                    tooltip.style('left', Math.min(tx, svgContainer.clientWidth - tipW - 10) + 'px')
+                        .style('top', Math.max(5, Math.min(ty, svgContainer.clientHeight - tipH - 10)) + 'px');
+                })
+                .on('mouseleave', function() {
+                    tooltip.style('display', 'none');
+                    link.attr('stroke-opacity', 0.55).attr('stroke', '#c8b89a').attr('stroke-width', le => Math.max(1,
+                        Math.min(7, le.weight * 0.7)));
+                    nodeGroup.selectAll('circle:nth-child(2)').attr('fill-opacity', 0.85).attr('stroke', '#fff')
+                        .attr('stroke-width', 1.8).attr('stroke-opacity', 0.9);
+                    nodeGroup.selectAll('text').attr('fill-opacity', 1);
+                })
+                .on('click', function(event, d) {
+                    event.stopPropagation();
+                    const transform = d3.zoomIdentity.translate(width / 2, height / 2).scale(1.8).translate(-d.x, -
+                        d.y);
+                    svg.transition().duration(600).call(zoom.transform, transform);
+                    document.getElementById('searchInput').value = d.label;
+                });
+
+            svg.on('click', function(event) {
+                if (event.target === svg.node()) {
+                    svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(width * 0.08,
+                        height * 0.05).scale(initialScale));
+                }
+            });
+
+            simulation.on('tick', () => {
+                link.attr('x1', d => d.source.x).attr('y1', d => d.source.y)
+                    .attr('x2', d => d.target.x).attr('y2', d => d.target.y);
+                linkLabel.attr('x', d => (d.source.x + d.target.x) / 2).attr('y', d => (d.source.y + d.target.y) /
+                    2);
+                nodeGroup.attr('transform', d => `translate(${d.x},${d.y})`);
+            });
+            simulation.on('end', () => simulation.alphaTarget(0).alpha(0.02));
+
+            // ==================== 搜索功能 ====================
+            function focusNode(label) {
+                const found = d3Nodes.find(n => n.label === label);
+                if (!found) {
+                    alert('未找到人物：“' + label + '”');
+                    return;
+                }
+                const transform = d3.zoomIdentity.translate(width / 2, height / 2).scale(1.8).translate(-found.x, -
+                    found.y);
+                svg.transition().duration(600).call(zoom.transform, transform);
+                // 模拟悬停高亮
+                nodeGroup.each(function(d) {
+                    if (d.id === found.id) {
+                        const neighborIds = new Set(adj.get(d.id).map(e => e.neighbor));
+                        d3.select(this).select('circle:nth-child(2)').attr('stroke', '#ffd700').attr(
+                            'stroke-width', 3.5).attr('fill-opacity', 1);
+                        link.attr('stroke-opacity', le => (le.source.id === d.id || le.target.id === d.id) ?
+                            0.9 : 0.15);
+                        nodeGroup.selectAll('circle:nth-child(2)')
+                            .attr('fill-opacity', nd => neighborIds.has(nd.id) || nd.id === d.id ? 1 : 0.35);
+                        nodeGroup.selectAll('text').attr('fill-opacity', nd => neighborIds.has(nd.id) || nd
+                            .id === d.id ? 1 : 0.3);
+                    }
+                });
+                setTimeout(() => {
+                    link.attr('stroke-opacity', 0.55).attr('stroke', '#c8b89a');
+                    nodeGroup.selectAll('circle:nth-child(2)').attr('fill-opacity', 0.85).attr('stroke', '#fff')
+                        .attr('stroke-width', 1.8);
+                    nodeGroup.selectAll('text').attr('fill-opacity', 1);
+                }, 2500);
+            }
+
+            document.getElementById('searchBtn').addEventListener('click', () => {
+                const input = document.getElementById('searchInput').value.trim();
+                if (input) focusNode(input);
+            });
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    const input = document.getElementById('searchInput').value.trim();
+                    if (input) focusNode(input);
+                }
+            });
+            document.getElementById('resetBtn').addEventListener('click', () => {
+                svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(width * 0.08,
+                    height * 0.05).scale(initialScale));
+                document.getElementById('searchInput').value = '';
+                link.attr('stroke-opacity', 0.55).attr('stroke', '#c8b89a');
+                nodeGroup.selectAll('circle:nth-child(2)').attr('fill-opacity', 0.85).attr('stroke', '#fff');
+                nodeGroup.selectAll('text').attr('fill-opacity', 1);
+            });
+
+            function handleResize() {
+                const newRect = svgContainer.getBoundingClientRect();
+                const newW = newRect.width || 700;
+                const newH = Math.max(550, newRect.height || 580);
+                svg.attr('viewBox', `0 0 ${newW} ${newH}`);
+                simulation.force('center', d3.forceCenter(newW / 2, newH / 2));
+                simulation.alpha(0.1).restart();
+            }
+            window.addEventListener('resize', handleResize);
+            simulation.alpha(1).restart();
+
+            console.log('✅ 《甄嬛传》人物关系网络分析 · 增强版已就绪');
+            console.log('  新增：社区排名表、特征向量排名、平均聚类系数、节点搜索');
+        })();
+    </script>
+</body>
+</html>
